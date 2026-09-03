@@ -2,9 +2,16 @@ import streamlit as st
 import pandas as pd
 import joblib
 from datetime import datetime
+import json
+import random
+import string
+import os
 
 
-# Page settings
+# ==============================
+# PAGE SETTINGS
+# ==============================
+
 st.set_page_config(
     page_title="Banking Queue System",
     page_icon="🏦"
@@ -31,7 +38,6 @@ st.write("Hammad Behzad")
 st.write("Muhammad Shahzad")
 st.write("Imran Latif")
 
-
 st.write("---")
 
 
@@ -40,6 +46,38 @@ st.write("---")
 # ==============================
 
 model = joblib.load("bank_queue_model.pkl")
+
+
+# ==============================
+# DAILY TICKET SYSTEM
+# ==============================
+
+counter_file = "daily_ticket_counter.json"
+
+today = datetime.now().strftime("%Y-%m-%d")
+
+
+# Check if counter file exists
+if os.path.exists(counter_file):
+
+    with open(counter_file, "r") as file:
+        counter_data = json.load(file)
+
+else:
+
+    counter_data = {
+        "date": today,
+        "count": 0
+    }
+
+
+# If new day, start from 0
+if counter_data["date"] != today:
+
+    counter_data = {
+        "date": today,
+        "count": 0
+    }
 
 
 # ==============================
@@ -59,7 +97,6 @@ service = st.selectbox(
     ]
 )
 
-
 st.write("---")
 
 
@@ -69,7 +106,21 @@ st.write("---")
 
 if st.button("🎫 Get Ticket"):
 
-    # Current time
+    # Increase today's ticket number
+    counter_data["count"] += 1
+
+    ticket_number = counter_data["count"]
+
+
+    # Save today's counter
+    with open(counter_file, "w") as file:
+        json.dump(counter_data, file)
+
+
+    # ==============================
+    # CURRENT TIME
+    # ==============================
+
     current_time = datetime.now()
 
     hour = current_time.hour
@@ -77,14 +128,13 @@ if st.button("🎫 Get Ticket"):
 
 
     # ==============================
-    # READ PREVIOUS CUSTOMER DATA
+    # READ PREVIOUS DATA
     # ==============================
 
     try:
 
         history = pd.read_csv("queue_data.csv")
 
-        # Remove missing values
         history = history.dropna(
             subset=[
                 "wait_time",
@@ -92,16 +142,12 @@ if st.button("🎫 Get Ticket"):
             ]
         )
 
-        # Previous waiting time
-        previous_waiting_time = history["wait_time"].mean()
-
-        # Previous queue length
-        previous_queue_length = history["queue_length"].mean()
+        previous_queue_length = history[
+            "queue_length"
+        ].mean()
 
     except:
 
-        # Backup values
-        previous_waiting_time = 10
         previous_queue_length = 5
 
 
@@ -131,16 +177,24 @@ if st.button("🎫 Get Ticket"):
 
     waiting_time = prediction[0]
 
-    # Prevent negative waiting time
     waiting_time = max(0, waiting_time)
 
 
     # ==============================
-    # GENERATE TICKET NUMBER
+    # RANDOM TICKET CODE
     # ==============================
 
-    ticket_number = int(previous_queue_length) + 1
+    random_code = "".join(
+        random.choices(
+            string.ascii_uppercase + string.digits,
+            k=4
+        )
+    )
 
+
+    # ==============================
+    # SERVICE PREFIX
+    # ==============================
 
     if service == "Cash Deposit":
 
@@ -163,14 +217,26 @@ if st.button("🎫 Get Ticket"):
         prefix = "D"
 
 
-    ticket = prefix + "-" + str(ticket_number).zfill(3)
+    # ==============================
+    # FINAL TICKET
+    # ==============================
+
+    ticket = (
+        prefix
+        + "-"
+        + str(ticket_number).zfill(3)
+        + "-"
+        + random_code
+    )
 
 
     # ==============================
     # SHOW TICKET
     # ==============================
 
-    st.success("🎉 Your Ticket Has Been Generated!")
+    st.success(
+        "🎉 Your Ticket Has Been Generated!"
+    )
 
     st.write("---")
 
@@ -178,7 +244,15 @@ if st.button("🎫 Get Ticket"):
 
     st.title(ticket)
 
-    st.write("Service:", service)
+    st.write(
+        "Service:",
+        service
+    )
+
+    st.write(
+        "Ticket Number:",
+        ticket_number
+    )
 
     st.write(
         "Estimated Waiting Time:",
